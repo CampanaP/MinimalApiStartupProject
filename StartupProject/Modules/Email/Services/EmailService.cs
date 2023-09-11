@@ -1,7 +1,8 @@
-﻿using Serilog;
-using System.Net.Mail;
-using System.Reflection;
+﻿using MailKit.Net.Smtp;
+using MimeKit;
+using Serilog;
 using System.Text.Json;
+using Microsoft.IdentityModel.Tokens;
 using $safeprojectname$.Modules.Email.Interfaces.Services;
 using $safeprojectname$.Modules.Email.Enums;
 
@@ -16,147 +17,107 @@ namespace $safeprojectname$.Modules.Email.Services
 			_configuration = configuration;
 		}
 
-		private void SendEmail(object data)
+		private void SendEmail(MimeMessage email)
 		{
-			MailMessage? emailMessage = data as MailMessage;
-			if (emailMessage is null)
-			{
-				return;
-			}
-
-			SmtpClient smtpClient = new SmtpClient();
 			string? host = _configuration.GetValue<string>("Smtp:Host");
 			string? username = _configuration.GetValue<string>("Smtp:Username");
 			string? password = _configuration.GetValue<string>("Smtp:Password");
 
 			if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
 			{
+				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email - Configurations are not valid");
+
 				return;
 			}
 
-			smtpClient.Host = host;
-			smtpClient.Credentials = new System.Net.NetworkCredential(username, password);
-
 			try
 			{
-				smtpClient.Send(emailMessage);
+				using (SmtpClient smtpClient = new SmtpClient())
+				{
+					smtpClient.Connect(host, 587, false);
+
+					smtpClient.Authenticate(username, password);
+
+					smtpClient.Send(email);
+
+					smtpClient.Disconnect(true);
+				}
 			}
-			catch (SmtpException ex)
+			catch (Exception ex)
 			{
 				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email: {JsonSerializer.Serialize(ex)}");
 			}
 		}
 
-		public void SendEmail(IEnumerable<string> recipients, string @object, string body, EmailBodyFormats bodyFormat, string? sender = null, string? displayName = null, IEnumerable<string>? carbonCopyRecipients = null)
+		public void SendEmail(IEnumerable<string> recipients, string subject, string body, EmailBodyFormats bodyFormat, string? sender = null, string? displayName = null, IEnumerable<string>? carbonCopyRecipients = null, IEnumerable<System.Net.Mail.Attachment>? attachments = null)
 		{
 			if (string.IsNullOrWhiteSpace(sender))
 			{
 				sender = _configuration.GetValue<string>("Smtp:FromAddress");
-			}
 
-			if (string.IsNullOrWhiteSpace(displayName))
-			{
-				displayName = "ConnectorProject";
-			}
-
-			SendEmail(recipients, @object, body, bodyFormat, null, sender, displayName, carbonCopyRecipients);
-		}
-
-		public void SendEmail(IEnumerable<string> recipients, string @object, string body, EmailBodyFormats bodyFormat, List<Attachment>? attachments = null, string? sender = null, string? displayName = null, IEnumerable<string>? carbonCopyRecipients = null)
-		{
-			if (string.IsNullOrWhiteSpace(sender))
-			{
-				sender = _configuration.GetValue<string>("Smtp:FromAddress");
-			}
-
-			if (string.IsNullOrWhiteSpace(displayName))
-			{
-				displayName = "ConnectorProject";
-			}
-
-			MailMessage message = new MailMessage();
-
-			foreach (string recipientMail in recipients)
-			{
-				message.To.Add(recipientMail);
-			}
-
-			if (string.IsNullOrWhiteSpace(sender))
-			{
-				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Sender is null");
-
-				return;
-			}
-
-			MailAddress senderEmail = new MailAddress(sender);
-
-			if (!string.IsNullOrWhiteSpace(displayName))
-			{
-				senderEmail = new MailAddress(sender, displayName);
-			}
-
-			message.IsBodyHtml = bodyFormat == EmailBodyFormats.Html;
-			message.Subject = @object;
-			message.Body = body;
-			message.Sender = senderEmail;
-			message.From = senderEmail;
-
-			if (carbonCopyRecipients != null && carbonCopyRecipients.Any())
-			{
-				foreach (string carbonCopyRecipient in carbonCopyRecipients)
+				if (string.IsNullOrWhiteSpace(sender))
 				{
-					if (string.IsNullOrWhiteSpace(carbonCopyRecipient))
+					Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Sender is null");
+
+					return;
+				}
+			}
+
+			if (string.IsNullOrWhiteSpace(displayName))
+			{
+				displayName = _configuration.GetValue<string>("Smtp:DisplayName");
+			}
+
+			try
+			{
+				List<MailboxAddress> recipientMailboxAddresses = new List<MailboxAddress>();
+				foreach (string recipientEmail in recipients)
+				{
+					recipientMailboxAddresses.Add(new MailboxAddress(recipientEmail.Split("@")?[0] ?? string.Empty, recipientEmail));
+				}
+
+				List<MailboxAddress> fromMailboxAddresses = new List<MailboxAddress>() { new MailboxAddress(displayName, sender) };
+
+				BodyBuilder bodyBuilder = new BodyBuilder()
+				{
+					HtmlBody = bodyFormat == EmailBodyFormats.Html ? body : null,
+					TextBody = bodyFormat == EmailBodyFormats.Text ? body : null,
+				};
+
+				if (attachments is not null && !attachments.IsNullOrEmpty())
+				{
+					foreach (System.Net.Mail.Attachment attachment in attachments)
 					{
-						continue;
+						bodyBuilder.Attachments.Add(new MimePart()
+						{
+							Content = new MimeContent(attachment.ContentStream),
+							FileName = attachment.Name
+						});
 					}
-
-					message.CC.Add(new MailAddress(carbonCopyRecipient));
 				}
-			}
 
-			message.DeliveryNotificationOptions = DeliveryNotificationOptions.OnFailure;
+				MimeMessage message = new MimeMessage(fromMailboxAddresses, recipientMailboxAddresses, subject, bodyBuilder.ToMessageBody());
 
-			if (attachments != null)
-			{
-				foreach (var data in attachments)
+				if (carbonCopyRecipients is not null && !carbonCopyRecipients.IsNullOrEmpty())
 				{
-					message.Attachments.Add(data);
+					foreach (string carbonCopyRecipient in carbonCopyRecipients)
+					{
+						message.Cc.Add(new MailboxAddress(carbonCopyRecipient.Split("@")?[0] ?? string.Empty, carbonCopyRecipient));
+					}
 				}
-			}
 
-			new Thread(() =>
-			{
-				Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
-				SendEmail(message);
-			}).Start();
-		}
-
-		public string GetBodyEmailFromObject(object data)
-		{
-			string response = string.Empty;
-
-			if (data is null)
-			{
-				return response;
-			}
-
-			foreach (PropertyInfo propertyInfo in data.GetType().GetProperties())
-			{
-				try
+				new Thread(() =>
 				{
-					response += $"{propertyInfo.Name}: {propertyInfo.GetValue(data)?.ToString()}\n";
-				}
-				catch (Exception ex)
-				{
-					Log.Error($"{nameof(EmailService)} - {nameof(GetBodyEmailFromObject)} - ERROR {ex.Message}");
-
-					continue;
-				}
+					Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+					SendEmail(message);
+				}).Start();
+			}
+			catch (Exception ex)
+			{
+				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email: {JsonSerializer.Serialize(ex)}");
 			}
 
-			response += "\n------------------------------\n\n";
-
-			return response;
+			return;
 		}
 	}
 }
