@@ -106,11 +106,13 @@ namespace $safeprojectname$.Modules.Email.Services
 					}
 				}
 
-				new Thread(() =>
+				Task.Run(() => SendEmail(message)).ContinueWith(completedTaks =>
 				{
-					Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
-					SendEmail(message);
-				}).Start();
+					if (completedTaks.IsFaulted && completedTaks.Exception is not null && completedTaks.Exception.InnerException is not null)
+					{
+						Log.Error($"{nameof(SendEmail)} - ExceptionMessage: {completedTaks.Exception.InnerException.Message} - ExceptionStackTrace: {completedTaks.Exception.InnerException.StackTrace}");
+					}
+				});
 			}
 			catch (Exception ex)
 			{
