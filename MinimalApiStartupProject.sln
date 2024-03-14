@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.33801.447
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StartupProject", "StartupProject\StartupProject.csproj", "{440CF7FE-A153-4157-8757-BBBA7711DF88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MinimalApiStartupProject", "MinimalApiStartupProject\MinimalApiStartupProject.csproj", "{440CF7FE-A153-4157-8757-BBBA7711DF88}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Serilog;
-using $safeprojectname$.Modules.ModuleExtensions;
 using System.Text.Json;
+using $safeprojectname$.Modules.ModuleExtensions;
 
 namespace $safeprojectname$
 {
