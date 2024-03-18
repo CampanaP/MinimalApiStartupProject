@@ -1,21 +1,17 @@
-﻿using $safeprojectname$.Modules.Api.Interfaces.Services;
-using $safeprojectname$.Modules.Api.Services;
-using $safeprojectname$.Modules.ModuleExtensions;
+﻿using $safeprojectname$.Infrastructures.ModuleExtensions;
 
 namespace $safeprojectname$.Modules.Api
 {
-	public class ApiModule : IModule
-	{
-		public IServiceCollection RegisterModules(IServiceCollection services)
-		{
-			services.AddScoped<IApiService, ApiService>();
+    public class ApiModule : IModule
+    {
+        public IServiceCollection RegisterModules(IServiceCollection services)
+        {
+            return services;
+        }
 
-			return services;
-		}
-
-		public IEndpointRouteBuilder MapEndpoints(IEndpointRouteBuilder endpoints)
-		{
-			return endpoints;
-		}
-	}
+        public IEndpointRouteBuilder MapEndpoints(IEndpointRouteBuilder endpoints)
+        {
+            return endpoints;
+        }
+    }
 }

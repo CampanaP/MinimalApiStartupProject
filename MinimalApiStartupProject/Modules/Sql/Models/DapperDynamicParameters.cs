@@ -1,10 +1,10 @@
 ﻿using Dapper;
 using System.Reflection;
-using $safeprojectname$.Modules.Sql.ExtensionMethods;
+using $safeprojectname$.Infrastructures.StringExtensions;
 
 namespace $safeprojectname$.Modules.Sql.Models
 {
-	public class DapperDynamicParameters : DynamicParameters
+    public class DapperDynamicParameters : DynamicParameters
 	{
 		public DapperDynamicParameters(object parameters)
 		{

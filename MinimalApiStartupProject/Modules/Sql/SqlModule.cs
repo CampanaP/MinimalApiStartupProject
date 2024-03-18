@@ -1,21 +1,17 @@
-﻿using $safeprojectname$.Modules.ModuleExtensions;
-using $safeprojectname$.Modules.Sql.Interfaces.Repositories;
-using $safeprojectname$.Modules.Sql.Repositories;
+﻿using $safeprojectname$.Infrastructures.ModuleExtensions;
 
 namespace $safeprojectname$.Modules.Sql
 {
-	public class SqlModule : IModule
-	{
-		public IServiceCollection RegisterModules(IServiceCollection services)
-		{
-			services.AddScoped<ISqlRepository, SqlRepository>();
+    public class SqlModule : IModule
+    {
+        public IServiceCollection RegisterModules(IServiceCollection services)
+        {
+            return services;
+        }
 
-			return services;
-		}
-
-		public IEndpointRouteBuilder MapEndpoints(IEndpointRouteBuilder endpoints)
-		{
-			return endpoints;
-		}
-	}
+        public IEndpointRouteBuilder MapEndpoints(IEndpointRouteBuilder endpoints)
+        {
+            return endpoints;
+        }
+    }
 }

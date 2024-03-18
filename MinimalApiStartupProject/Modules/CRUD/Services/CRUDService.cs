@@ -1,84 +1,86 @@
 ﻿using Dapper;
-using Serilog;
+using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
 using $safeprojectname$.Modules.CRUD.Interfaces.Services;
 using $safeprojectname$.Modules.Sql.Interfaces.Repositories;
 using $safeprojectname$.Modules.Sql.Models;
+using Serilog;
 
 namespace $safeprojectname$.Modules.CRUD.Services
 {
-	public class CRUDService : ICRUDService
-	{
-		private readonly IConfiguration _configuration;
-		private readonly ISqlRepository _sqlRepository;
+    [ScopedLifetime]
+    public class CRUDService : ICRUDService
+    {
+        private readonly IConfiguration _configuration;
+        private readonly ISqlRepository _sqlRepository;
 
-		public CRUDService(IConfiguration configuration, ISqlRepository sqlRepository)
-		{
-			_configuration = configuration;
-			_sqlRepository = sqlRepository;
-		}
+        public CRUDService(IConfiguration configuration, ISqlRepository sqlRepository)
+        {
+            _configuration = configuration;
+            _sqlRepository = sqlRepository;
+        }
 
-		public async Task<IEnumerable<T>> GetItems<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
-		{
-			IEnumerable<T> items = Enumerable.Empty<T>();
+        public async Task<IEnumerable<T>> GetItems<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
+        {
+            IEnumerable<T> items = Enumerable.Empty<T>();
 
-			string? connectionString = _configuration.GetConnectionString(connectionStringName);
-			if (string.IsNullOrWhiteSpace(connectionString))
-			{
-				Log.Error($"{nameof(CRUDService)} - {nameof(GetItems)} - {query}: ConnectionString is empty");
+            string? connectionString = _configuration.GetConnectionString(connectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Log.Error($"{nameof(CRUDService)} - {nameof(GetItems)} - {query}: ConnectionString is empty");
 
-				return items;
-			}
+                return items;
+            }
 
-			items = await _sqlRepository.ExecuteQuery<T>(connectionString, query, parameters);
+            items = await _sqlRepository.ExecuteQuery<T>(connectionString, query, parameters);
 
-			return items;
-		}
+            return items;
+        }
 
-		public async Task<T?> GetItem<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
-		{
-			T? item = default;
+        public async Task<T?> GetItem<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
+        {
+            T? item = default(T?);
 
-			string? connectionString = _configuration.GetConnectionString(connectionStringName);
-			if (string.IsNullOrWhiteSpace(connectionString))
-			{
-				Log.Error($"{nameof(CRUDService)} - {nameof(GetItem)} - {query}: ConnectionString is empty");
+            string? connectionString = _configuration.GetConnectionString(connectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Log.Error($"{nameof(CRUDService)} - {nameof(GetItem)} - {query}: ConnectionString is empty");
 
-				return item;
-			}
+                return item;
+            }
 
-			item = await _sqlRepository.ExecuteFirstQuery<T>(connectionString, query, parameters);
+            item = await _sqlRepository.ExecuteFirstQuery<T>(connectionString, query, parameters);
 
-			return item;
-		}
+            return item;
+        }
 
-		public async Task SaveItems(string connectionStringName, List<TransactionQuery> queries)
-		{
-			string? connectionString = _configuration.GetConnectionString(connectionStringName);
-			if (string.IsNullOrWhiteSpace(connectionString))
-			{
-				Log.Error($"{nameof(CRUDService)} - {nameof(SaveItems)}: ConnectionString is empty");
+        public async Task SaveItems(string connectionStringName, List<TransactionQuery> queries)
+        {
+            string? connectionString = _configuration.GetConnectionString(connectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Log.Error($"{nameof(CRUDService)} - {nameof(SaveItems)}: ConnectionString is empty");
 
-				return;
-			}
+                return;
+            }
 
-			await _sqlRepository.ExecuteTransaction(connectionString, queries);
+            await _sqlRepository.ExecuteTransaction(connectionString, queries);
 
-			return;
-		}
+            return;
+        }
 
-		public async Task SaveItem(string connectionStringName, string query, DynamicParameters parameters)
-		{
-			string? connectionString = _configuration.GetConnectionString(connectionStringName);
-			if (string.IsNullOrWhiteSpace(connectionString))
-			{
-				Log.Error($"{nameof(CRUDService)} - {nameof(SaveItem)} - {query}: ConnectionString is empty");
+        public async Task SaveItem(string connectionStringName, string query, DynamicParameters parameters)
+        {
+            string? connectionString = _configuration.GetConnectionString(connectionStringName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Log.Error($"{nameof(CRUDService)} - {nameof(SaveItem)} - {query}: ConnectionString is empty");
 
-				return;
-			}
+                return;
+            }
 
-			await _sqlRepository.ExecuteNonQuery(connectionString, query, parameters);
+            await _sqlRepository.ExecuteNonQuery(connectionString, query, parameters);
 
-			return;
-		}
-	}
+            return;
+        }
+    }
 }

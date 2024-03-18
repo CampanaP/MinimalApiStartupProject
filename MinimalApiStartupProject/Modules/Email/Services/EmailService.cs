@@ -1,125 +1,149 @@
 ﻿using MailKit.Net.Smtp;
-using MimeKit;
-using Serilog;
-using System.Text.Json;
 using Microsoft.IdentityModel.Tokens;
-using $safeprojectname$.Modules.Email.Interfaces.Services;
+using MimeKit;
+using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
+using $safeprojectname$.Modules.Email.Entities;
 using $safeprojectname$.Modules.Email.Enums;
+using $safeprojectname$.Modules.Email.Interfaces.Services;
+using $safeprojectname$.Modules.Email.Settings;
+using Serilog;
 
 namespace $safeprojectname$.Modules.Email.Services
 {
-	public class EmailService : IEmailService
-	{
-		private IConfiguration _configuration;
+    [ScopedLifetime]
+    internal class EmailService : IEmailService
+    {
+        private readonly IConfiguration _configuration;
 
-		public EmailService(IConfiguration configuration)
-		{
-			_configuration = configuration;
-		}
+        public EmailService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
-		private void SendEmail(MimeMessage email)
-		{
-			string? host = _configuration.GetValue<string>("Smtp:Host");
-			string? username = _configuration.GetValue<string>("Smtp:Username");
-			string? password = _configuration.GetValue<string>("Smtp:Password");
+        private MimeMessage? getMimeMessage(EmailMessage message)
+        {
+            MimeMessage? mimeMessage = null;
 
-			if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-			{
-				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email - Configurations are not valid");
+            EmailSettings? settings = _configuration.Get<EmailSettings>();
 
-				return;
-			}
+            if (settings is null || settings.SenderAddress is null)
+            {
+                return mimeMessage;
+            }
 
-			try
-			{
-				using (SmtpClient smtpClient = new SmtpClient())
-				{
-					smtpClient.Connect(host, 587, false);
+            if (settings.SenderDisplayName is null && string.IsNullOrWhiteSpace(message.SenderDisplayName))
+            {
+                message.SenderDisplayName = settings.SenderAddress.Split("@")?[0] ?? string.Empty;
 
-					smtpClient.Authenticate(username, password);
+                if (!string.IsNullOrWhiteSpace(message.SenderAddress))
+                {
+                    message.SenderDisplayName = message.SenderAddress.Split("@")?[0] ?? string.Empty;
+                }
+            }
 
-					smtpClient.Send(email);
+            MailboxAddress sender = new MailboxAddress(settings.SenderDisplayName, settings.SenderAddress);
 
-					smtpClient.Disconnect(true);
-				}
-			}
-			catch (Exception ex)
-			{
-				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email: {JsonSerializer.Serialize(ex)}");
-			}
-		}
+            if (!string.IsNullOrWhiteSpace(message.SenderAddress))
+            {
+                sender.Address = message.SenderAddress;
+            }
 
-		public void SendEmail(IEnumerable<string> recipients, string subject, string body, EmailBodyFormats bodyFormat, string? sender = null, string? displayName = null, IEnumerable<string>? carbonCopyRecipients = null, IEnumerable<System.Net.Mail.Attachment>? attachments = null)
-		{
-			if (string.IsNullOrWhiteSpace(sender))
-			{
-				sender = _configuration.GetValue<string>("Smtp:FromAddress");
+            if (!string.IsNullOrWhiteSpace(message.SenderDisplayName))
+            {
+                sender.Name = message.SenderDisplayName;
+            }
 
-				if (string.IsNullOrWhiteSpace(sender))
-				{
-					Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Sender is null");
+            List<MailboxAddress> recipientMailboxAddresses = new List<MailboxAddress>();
+            if (!message.Recipients.IsNullOrEmpty())
+            {
+                foreach (string recipientEmail in message.Recipients!)
+                {
+                    recipientMailboxAddresses.Add(new MailboxAddress(recipientEmail.Split("@")?[0] ?? string.Empty, recipientEmail));
+                }
+            }
 
-					return;
-				}
-			}
+            BodyBuilder bodyBuilder = new BodyBuilder()
+            {
+                HtmlBody = message.BodyFormat == EmailBodyFormats.Html ? message.Body : null,
+                TextBody = message.BodyFormat == EmailBodyFormats.Text ? message.Body : null,
+            };
 
-			if (string.IsNullOrWhiteSpace(displayName))
-			{
-				displayName = _configuration.GetValue<string>("Smtp:DisplayName");
-			}
+            if (!message.Attachments.IsNullOrEmpty())
+            {
+                foreach (System.Net.Mail.Attachment attachment in message.Attachments!)
+                {
+                    bodyBuilder.Attachments.Add(new MimePart()
+                    {
+                        Content = new MimeContent(attachment.ContentStream),
+                        FileName = attachment.Name
+                    });
+                }
+            }
 
-			try
-			{
-				List<MailboxAddress> recipientMailboxAddresses = new List<MailboxAddress>();
-				foreach (string recipientEmail in recipients)
-				{
-					recipientMailboxAddresses.Add(new MailboxAddress(recipientEmail.Split("@")?[0] ?? string.Empty, recipientEmail));
-				}
+            mimeMessage = new MimeMessage(sender, recipientMailboxAddresses, message.Subject, bodyBuilder.ToMessageBody());
 
-				List<MailboxAddress> fromMailboxAddresses = new List<MailboxAddress>() { new MailboxAddress(displayName, sender) };
+            if (!message.CarbonCopyRecipients.IsNullOrEmpty())
+            {
+                foreach (string carbonCopyRecipient in message.CarbonCopyRecipients!)
+                {
+                    mimeMessage.Cc.Add(new MailboxAddress(carbonCopyRecipient.Split("@")?[0] ?? string.Empty, carbonCopyRecipient));
+                }
+            }
 
-				BodyBuilder bodyBuilder = new BodyBuilder()
-				{
-					HtmlBody = bodyFormat == EmailBodyFormats.Html ? body : null,
-					TextBody = bodyFormat == EmailBodyFormats.Text ? body : null,
-				};
+            if (!message.BlindCarbonCopyRecipients.IsNullOrEmpty())
+            {
+                foreach (string blindCarbonCopyRecipient in message.BlindCarbonCopyRecipients!)
+                {
+                    mimeMessage.Bcc.Add(new MailboxAddress(blindCarbonCopyRecipient.Split("@")?[0] ?? string.Empty, blindCarbonCopyRecipient));
+                }
+            }
 
-				if (attachments is not null && !attachments.IsNullOrEmpty())
-				{
-					foreach (System.Net.Mail.Attachment attachment in attachments)
-					{
-						bodyBuilder.Attachments.Add(new MimePart()
-						{
-							Content = new MimeContent(attachment.ContentStream),
-							FileName = attachment.Name
-						});
-					}
-				}
+            return mimeMessage;
+        }
 
-				MimeMessage message = new MimeMessage(fromMailboxAddresses, recipientMailboxAddresses, subject, bodyBuilder.ToMessageBody());
+        private async Task send(MimeMessage message, CancellationToken cancellationToken = default)
+        {
+            EmailSettings? settings = _configuration.Get<EmailSettings>();
 
-				if (carbonCopyRecipients is not null && !carbonCopyRecipients.IsNullOrEmpty())
-				{
-					foreach (string carbonCopyRecipient in carbonCopyRecipients)
-					{
-						message.Cc.Add(new MailboxAddress(carbonCopyRecipient.Split("@")?[0] ?? string.Empty, carbonCopyRecipient));
-					}
-				}
+            if (settings is null || string.IsNullOrWhiteSpace(settings.Host) || string.IsNullOrWhiteSpace(settings.Username) || string.IsNullOrWhiteSpace(settings.Password))
+            {
+                Log.Error("{emailService} - {sendEmail} - ERROR: Send email - Configurations are not valid", new object[] { nameof(EmailService), nameof(SendEmail) }, null);
 
-				Task.Run(() => SendEmail(message)).ContinueWith(completedTaks =>
-				{
-					if (completedTaks.IsFaulted && completedTaks.Exception is not null && completedTaks.Exception.InnerException is not null)
-					{
-						Log.Error($"{nameof(SendEmail)} - ExceptionMessage: {completedTaks.Exception.InnerException.Message} - ExceptionStackTrace: {completedTaks.Exception.InnerException.StackTrace}");
-					}
-				});
-			}
-			catch (Exception ex)
-			{
-				Log.Error($"{nameof(EmailService)} - {nameof(SendEmail)} - ERROR Send email: {JsonSerializer.Serialize(ex)}");
-			}
+                throw new Exception("Send email - Configurations are not valid");
+            }
 
-			return;
-		}
-	}
+            try
+            {
+                using (SmtpClient smtpClient = new SmtpClient())
+                {
+                    await smtpClient.ConnectAsync(settings.Host, 587, true, cancellationToken);
+
+                    await smtpClient.AuthenticateAsync(settings.Username, settings.Password, cancellationToken);
+
+                    await smtpClient.SendAsync(message, cancellationToken);
+
+                    await smtpClient.DisconnectAsync(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("{emailService} - {sendEmail} - ERROR: Send email - {exceptionMessage}", new object[] { nameof(EmailService), nameof(SendEmail), ex.Message }, ex);
+
+                throw;
+            }
+        }
+
+        public async Task SendEmail(EmailMessage message, CancellationToken cancellationToken = default)
+        {
+            MimeMessage? mimeMessage = getMimeMessage(message);
+            if (mimeMessage is null)
+            {
+                Log.Error("{emailService} - {sendEmail} - ERROR: MimeMessage is null", new object[] { nameof(EmailService), nameof(SendEmail) }, null);
+
+                throw new Exception("MimeMessage is null");
+            }
+
+            await send(mimeMessage, cancellationToken);
+        }
+    }
 }
