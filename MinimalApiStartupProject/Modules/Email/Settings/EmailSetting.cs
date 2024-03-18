@@ -1,6 +1,6 @@
 ﻿namespace $safeprojectname$.Modules.Email.Settings
 {
-    internal class EmailSettings
+    internal class EmailSetting
     {
         public string? Host { get; set; }
 

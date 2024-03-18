@@ -1,5 +1,5 @@
-﻿using $safeprojectname$.Modules.Email.Enums;
-using System.Net.Mail;
+﻿using System.Net.Mail;
+using $safeprojectname$.Modules.Email.Enums;
 
 namespace $safeprojectname$.Modules.Email.Entities
 {
