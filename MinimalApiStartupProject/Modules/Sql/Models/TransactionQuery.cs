@@ -1,6 +1,6 @@
 ﻿using Dapper;
 
-namespace $safeprojectname$.Modules.Sql.Models
+namespace MinimalApiStartupProject.Modules.Sql.Models
 {
 	public class TransactionQuery
 	{

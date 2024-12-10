@@ -1,6 +1,6 @@
-﻿using $safeprojectname$.Infrastructures.ModuleExtensions;
+﻿using MinimalApiStartupProject.Infrastructures.ModuleExtensions;
 
-namespace $safeprojectname$.Modules.Sql
+namespace MinimalApiStartupProject.Modules.Sql
 {
     public class SqlModule : IModule
     {

@@ -1,18 +1,18 @@
 ﻿using Dapper;
-using $safeprojectname$.Modules.Sql.Models;
+using MinimalApiStartupProject.Modules.Sql.Models;
 
-namespace $safeprojectname$.Modules.Sql.Interfaces.Repositories
+namespace MinimalApiStartupProject.Modules.Sql.Interfaces.Repositories
 {
 	public interface ISqlRepository
 	{
-		Task<IEnumerable<T>> ExecuteQuery<T>(string connectionString, string query, DynamicParameters? parameters = null);
+		Task<IEnumerable<T>> ExecuteQueryAsync<T>(string connectionString, string query, DynamicParameters? parameters = null);
 
-		Task<T?> ExecuteFirstQuery<T>(string connectionString, string query, DynamicParameters? parameters = null);
+		Task<T?> ExecuteFirstQueryAsync<T>(string connectionString, string query, DynamicParameters? parameters = null);
 
-		Task<int> ExecuteCountQuery(string connectionString, string query, DynamicParameters? parameters = null);
+		Task<int> ExecuteCountQueryAsync(string connectionString, string query, DynamicParameters? parameters = null);
 
-		Task ExecuteNonQuery(string connectionString, string query, DynamicParameters? parameters = null);
+		Task ExecuteNonQueryAsync(string connectionString, string query, DynamicParameters? parameters = null);
 
-		Task ExecuteTransaction(string connectionString, List<TransactionQuery> transactionQueries);
+		Task ExecuteTransactionAsync(string connectionString, List<TransactionQuery> transactionQueries);
 	}
 }

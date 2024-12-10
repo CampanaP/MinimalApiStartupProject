@@ -1,20 +1,32 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
-using Serilog;
-using $safeprojectname$.Modules.Sql.Interfaces.Repositories;
-using $safeprojectname$.Modules.Sql.Models;
-using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
+using MinimalApiStartupProject.Infrastructures.Attributes;
+using MinimalApiStartupProject.Infrastructures.StringExtensions;
+using MinimalApiStartupProject.Modules.Sql.Interfaces.Repositories;
+using MinimalApiStartupProject.Modules.Sql.Models;
+using System.Text.Json;
 
-namespace $safeprojectname$.Modules.Sql.Repositories
+namespace MinimalApiStartupProject.Modules.Sql.Repositories
 {
     [ScopedLifetime]
     public class SqlRepository : ISqlRepository
     {
-        public SqlRepository()
+        private readonly ILogger<SqlRepository> _logger;
+
+        public SqlRepository(ILogger<SqlRepository> logger)
         {
+            _logger = logger;
         }
 
-        public async Task<IEnumerable<T>> ExecuteQuery<T>(string connectionString, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to execute select query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connectionString"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<T>> ExecuteQueryAsync<T>(string connectionString, string query, DynamicParameters? parameters = null)
         {
             IEnumerable<T> results = Enumerable.Empty<T>();
 
@@ -31,7 +43,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             }
             catch (SqlException ex)
             {
-                Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteQuery)} - {query}: {ex.Message}");
+                _logger.LogException(nameof(SqlRepository), nameof(ExecuteQueryAsync), query, ex.Message);
 
                 throw;
             }
@@ -39,7 +51,15 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             return results;
         }
 
-        public async Task<T?> ExecuteFirstQuery<T>(string connectionString, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to execute select query with top 1
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connectionString"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<T?> ExecuteFirstQueryAsync<T>(string connectionString, string query, DynamicParameters? parameters = null)
         {
             T? result = default;
 
@@ -56,7 +76,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             }
             catch (SqlException ex)
             {
-                Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteFirstQuery)} - {query}: {ex.Message}");
+                _logger.LogException(nameof(SqlRepository), nameof(ExecuteFirstQueryAsync), query, ex.Message);
 
                 throw;
             }
@@ -64,7 +84,14 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             return result;
         }
 
-        public async Task<int> ExecuteCountQuery(string connectionString, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to execute query with count
+        /// </summary>
+        /// <param name="connectionString"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<int> ExecuteCountQueryAsync(string connectionString, string query, DynamicParameters? parameters = null)
         {
             int result = -1;
 
@@ -81,7 +108,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             }
             catch (SqlException ex)
             {
-                Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteCountQuery)} - {query}: {ex.Message}");
+                _logger.LogException(nameof(SqlRepository), nameof(ExecuteCountQueryAsync), query, ex.Message);
 
                 throw;
             }
@@ -89,7 +116,14 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             return result;
         }
 
-        public async Task ExecuteNonQuery(string connectionString, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to execute command query 
+        /// </summary>
+        /// <param name="connectionString"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task ExecuteNonQueryAsync(string connectionString, string query, DynamicParameters? parameters = null)
         {
             try
             {
@@ -104,7 +138,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             }
             catch (SqlException ex)
             {
-                Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteNonQuery)} - {query}: {ex.Message}");
+                _logger.LogException(nameof(SqlRepository), nameof(ExecuteNonQueryAsync), query, ex.Message);
 
                 throw;
             }
@@ -112,7 +146,13 @@ namespace $safeprojectname$.Modules.Sql.Repositories
             return;
         }
 
-        public async Task ExecuteTransaction(string connectionString, List<TransactionQuery> transactionQueries)
+        /// <summary>
+        /// Async method to execute sql transaction with queries and commands
+        /// </summary>
+        /// <param name="connectionString"></param>
+        /// <param name="transactionQueries"></param>
+        /// <returns></returns>
+        public async Task ExecuteTransactionAsync(string connectionString, List<TransactionQuery> transactionQueries)
         {
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
@@ -131,7 +171,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
                 }
                 catch (SqlException ex)
                 {
-                    Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteTransaction)}: {ex.Message}");
+                    _logger.LogException(nameof(SqlRepository), nameof(ExecuteTransactionAsync), JsonSerializer.Serialize(transactionQueries), ex.Message);
 
                     try
                     {
@@ -139,7 +179,7 @@ namespace $safeprojectname$.Modules.Sql.Repositories
                     }
                     catch (Exception exRollBack)
                     {
-                        Log.Error($"{nameof(SqlRepository)} - {nameof(ExecuteTransaction)} - RollbackException: {exRollBack.Message}");
+                        _logger.LogException(nameof(SqlRepository), nameof(ExecuteTransactionAsync), JsonSerializer.Serialize(transactionQueries), exRollBack.Message);
 
                         throw;
                     }

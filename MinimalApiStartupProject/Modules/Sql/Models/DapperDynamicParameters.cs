@@ -1,8 +1,8 @@
 ﻿using Dapper;
 using System.Reflection;
-using $safeprojectname$.Infrastructures.StringExtensions;
+using MinimalApiStartupProject.Infrastructures.StringExtensions;
 
-namespace $safeprojectname$.Modules.Sql.Models
+namespace MinimalApiStartupProject.Modules.Sql.Models
 {
     public class DapperDynamicParameters : DynamicParameters
 	{

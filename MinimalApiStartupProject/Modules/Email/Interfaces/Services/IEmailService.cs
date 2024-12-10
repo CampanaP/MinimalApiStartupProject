@@ -1,9 +1,16 @@
-﻿using $safeprojectname$.Modules.Email.Entities;
+﻿using MinimalApiStartupProject.Modules.Email.Entities;
 
-namespace $safeprojectname$.Modules.Email.Interfaces.Services
+namespace MinimalApiStartupProject.Modules.Email.Interfaces.Services
 {
     public interface IEmailService
     {
-        Task SendEmail(EmailMessage message, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Async method to send EmailMessage
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        Task SendEmailAsync(EmailMessage message, CancellationToken cancellationToken = default);
     }
 }

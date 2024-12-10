@@ -1,4 +1,4 @@
-﻿namespace $safeprojectname$.Modules.Email.Settings
+﻿namespace MinimalApiStartupProject.Modules.Email.Settings
 {
     internal class EmailSetting
     {

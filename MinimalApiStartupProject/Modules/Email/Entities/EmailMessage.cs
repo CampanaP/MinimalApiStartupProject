@@ -1,7 +1,7 @@
 ﻿using System.Net.Mail;
-using $safeprojectname$.Modules.Email.Enums;
+using MinimalApiStartupProject.Modules.Email.Enums;
 
-namespace $safeprojectname$.Modules.Email.Entities
+namespace MinimalApiStartupProject.Modules.Email.Entities
 {
     public class EmailMessage
     {
@@ -21,6 +21,6 @@ namespace $safeprojectname$.Modules.Email.Entities
 
         public required string Body { get; set; }
 
-        public EmailBodyFormats BodyFormat { get; set; }
+        public EmailBodyFormat BodyFormat { get; set; }
     }
 }

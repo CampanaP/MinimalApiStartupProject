@@ -1,6 +1,6 @@
-﻿using $safeprojectname$.Infrastructures.ModuleExtensions;
+﻿using MinimalApiStartupProject.Infrastructures.ModuleExtensions;
 
-namespace $safeprojectname$.Modules.Api
+namespace MinimalApiStartupProject.Modules.Api
 {
     public class ApiModule : IModule
     {

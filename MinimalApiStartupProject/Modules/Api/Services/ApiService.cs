@@ -1,71 +1,91 @@
-﻿using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
-using $safeprojectname$.Modules.Api.Interfaces.Services;
-using $safeprojectname$.Modules.Api.Models;
-using Serilog;
+﻿using MinimalApiStartupProject.Infrastructures.Attributes;
+using MinimalApiStartupProject.Infrastructures.StringExtensions;
+using MinimalApiStartupProject.Modules.Api.Enums;
+using MinimalApiStartupProject.Modules.Api.Interfaces.Services;
+using MinimalApiStartupProject.Modules.Api.Models;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Serialization;
 
-namespace $safeprojectname$.Modules.Api.Services
+namespace MinimalApiStartupProject.Modules.Api.Services
 {
     [ScopedLifetime]
     internal class ApiService : IApiService
     {
-        public ApiService()
+        //https://timdeschryver.dev/blog/refactor-your-net-http-clients-to-typed-http-clients
+        private readonly HttpClient _httpClient;
+        private readonly ILogger<ApiService> _logger;
+
+        public ApiService(HttpClient httpClient, ILogger<ApiService> logger)
         {
+            _httpClient = httpClient;
+            _logger = logger;
         }
 
-        private async Task<TReturn?> sendRequest<TReturn, TParameter>(string endpointUrl, HttpMethod httpMethod, TParameter? requestContent = null, List<RequestHeader>? headers = null, bool isResponseXml = false, CancellationToken cancellationToken = default) where TParameter : class
+        /// <summary>
+        /// Async method to send request to external api
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <typeparam name="TParameter"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="httpMethod"></param>
+        /// <param name="requestContent"></param>
+        /// <param name="responseType"></param>
+        /// <param name="headers"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        private async Task<TReturn?> SendRequestAsync<TReturn, TParameter>(string endpointUrl, HttpMethod httpMethod, TParameter? requestContent = null, ResponseType? responseType = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
         {
             TReturn? data = default;
 
+            if (httpMethod == HttpMethod.Get)
+            {
+                endpointUrl = endpointUrl + requestContent;
+            }
+
             try
             {
-                using (HttpClient client = new HttpClient())
+                using (HttpRequestMessage request = new HttpRequestMessage(httpMethod, endpointUrl))
                 {
-                    if (httpMethod == HttpMethod.Get)
+                    if (requestContent != null && httpMethod != HttpMethod.Get)
                     {
-                        endpointUrl = endpointUrl + requestContent;
+                        request.Content = new StringContent(JsonSerializer.Serialize(requestContent), Encoding.UTF8, "application/json");
                     }
 
-                    using (HttpRequestMessage request = new HttpRequestMessage(httpMethod, endpointUrl))
+                    if (headers?.Any() ?? false)
                     {
-                        if (requestContent != null && httpMethod != HttpMethod.Get)
+                        foreach (RequestHeader header in headers)
                         {
-                            request.Content = new StringContent(JsonSerializer.Serialize(requestContent), Encoding.UTF8, "application/json");
+                            request.Headers.Add(header.Name, header.Value);
+                        }
+                    }
+
+                    using (HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken))
+                    {
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            _logger.LogException(nameof(ApiService), httpMethod.Method, JsonSerializer.Serialize(requestContent), $"{endpointUrl} Response status code: {response.StatusCode}");
+
+                            return data;
                         }
 
-                        if (headers?.Any() ?? false)
+                        string responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        if (string.IsNullOrWhiteSpace(responseContent))
                         {
-                            foreach (RequestHeader header in headers)
-                            {
-                                request.Headers.Add(header.Name, header.Value);
-                            }
+                            return data;
                         }
 
-                        using (HttpResponseMessage response = await client.SendAsync(request, cancellationToken))
+                        if (responseType.HasValue)
                         {
-                            if (!response.IsSuccessStatusCode)
+                            switch (responseType)
                             {
-                                Log.Error("{apiService} - {httpMethod}: {endpointUrl} - {requestContentJson} - {responseStatusCode}", new object[] { nameof(ApiService), httpMethod.Method, endpointUrl, JsonSerializer.Serialize(requestContent), response.StatusCode }, null);
-
-                                return data;
-                            }
-
-                            string responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                            if (string.IsNullOrWhiteSpace(responseContent))
-                            {
-                                return data;
-                            }
-
-                            if (isResponseXml)
-                            {
-                                XmlSerializer xmlSerializer = new XmlSerializer(typeof(TReturn));
-                                data = (TReturn?)xmlSerializer.Deserialize(new StringReader(responseContent));
-                            }
-                            else
-                            {
-                                data = JsonSerializer.Deserialize<TReturn>(responseContent);
+                                case ResponseType.Xml:
+                                    XmlSerializer xmlSerializer = new XmlSerializer(typeof(TReturn));
+                                    data = (TReturn?)xmlSerializer.Deserialize(new StringReader(responseContent));
+                                    break;
+                                case ResponseType.Json:
+                                    data = JsonSerializer.Deserialize<TReturn>(responseContent);
+                                    break;
                             }
                         }
                     }
@@ -73,7 +93,7 @@ namespace $safeprojectname$.Modules.Api.Services
             }
             catch (Exception ex)
             {
-                Log.Error("{apiService} - {httpMethod}: {endpointUrl} - {requestContentJson} - {responseStatusCode}", new object[] { nameof(ApiService), httpMethod.Method, endpointUrl, JsonSerializer.Serialize(requestContent), ex.Message }, ex);
+                _logger.LogException(nameof(ApiService), httpMethod.Method, JsonSerializer.Serialize(requestContent), $"{endpointUrl} Exception message: {ex.Message}");
 
                 throw;
             }
@@ -81,29 +101,83 @@ namespace $safeprojectname$.Modules.Api.Services
             return data;
         }
 
-        public async Task<TReturn?> Delete<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
+        /// <summary>
+        /// Async method to send delete request to external api
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <typeparam name="TParameter"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="requestContent"></param>
+        /// <param name="responseType"></param>
+        /// <param name="headers"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<TReturn?> DeleteAsync<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, ResponseType? responseType = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
         {
-            return await sendRequest<TReturn, TParameter>(endpointUrl, HttpMethod.Delete, requestContent, headers, cancellationToken: cancellationToken);
+            return await SendRequestAsync<TReturn, TParameter>(endpointUrl, HttpMethod.Delete, requestContent, responseType, headers, cancellationToken: cancellationToken);
         }
 
-        public async Task<T?> Get<T>(string endpointUrl, string? endpointParameters = null, List<RequestHeader>? headers = null, bool isResponseXml = false, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Async method to send get request to external api
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="endpointParameters"></param>
+        /// <param name="headers"></param>
+        /// <param name="responseType"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<T?> GetAsync<T>(string endpointUrl, string? endpointParameters = null, List<RequestHeader>? headers = null, ResponseType? responseType = null, CancellationToken cancellationToken = default)
         {
-            return await sendRequest<T, string>(endpointUrl, HttpMethod.Get, endpointParameters, headers, isResponseXml, cancellationToken);
+            return await SendRequestAsync<T, string>(endpointUrl, HttpMethod.Get, endpointParameters, responseType, headers, cancellationToken);
         }
 
-        public async Task<TReturn?> Patch<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
+        /// <summary>
+        /// Async method to send patch request to external api
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <typeparam name="TParameter"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="requestContent"></param>
+        /// <param name="responseType"></param>
+        /// <param name="headers"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<TReturn?> PatchAsync<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, ResponseType? responseType = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
         {
-            return await sendRequest<TReturn, TParameter>(endpointUrl, HttpMethod.Patch, requestContent, headers, cancellationToken: cancellationToken);
+            return await SendRequestAsync<TReturn, TParameter>(endpointUrl, HttpMethod.Patch, requestContent, responseType, headers, cancellationToken: cancellationToken);
         }
 
-        public async Task<TReturn?> Post<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
+        /// <summary>
+        /// Async method to send post request to external api
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <typeparam name="TParameter"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="requestContent"></param>
+        /// <param name="responseType"></param>
+        /// <param name="headers"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<TReturn?> PostAsync<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, ResponseType? responseType = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
         {
-            return await sendRequest<TReturn, TParameter>(endpointUrl, HttpMethod.Post, requestContent, headers, cancellationToken: cancellationToken);
+            return await SendRequestAsync<TReturn, TParameter>(endpointUrl, HttpMethod.Post, requestContent, responseType, headers, cancellationToken: cancellationToken);
         }
 
-        public async Task<TReturn?> Put<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
+        /// <summary>
+        /// Async method to send put request to external api
+        /// </summary>
+        /// <typeparam name="TReturn"></typeparam>
+        /// <typeparam name="TParameter"></typeparam>
+        /// <param name="endpointUrl"></param>
+        /// <param name="requestContent"></param>
+        /// <param name="responseType"></param>
+        /// <param name="headers"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public async Task<TReturn?> PutAsync<TReturn, TParameter>(string endpointUrl, TParameter? requestContent = null, ResponseType? responseType = null, List<RequestHeader>? headers = null, CancellationToken cancellationToken = default) where TParameter : class
         {
-            return await sendRequest<TReturn, TParameter>(endpointUrl, HttpMethod.Put, requestContent, headers, cancellationToken: cancellationToken);
+            return await SendRequestAsync<TReturn, TParameter>(endpointUrl, HttpMethod.Put, requestContent, responseType, headers, cancellationToken: cancellationToken);
         }
     }
 }

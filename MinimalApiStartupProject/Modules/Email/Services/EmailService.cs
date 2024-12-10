@@ -1,26 +1,34 @@
 ﻿using MailKit.Net.Smtp;
 using Microsoft.IdentityModel.Tokens;
 using MimeKit;
-using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
-using $safeprojectname$.Modules.Email.Entities;
-using $safeprojectname$.Modules.Email.Enums;
-using $safeprojectname$.Modules.Email.Interfaces.Services;
-using $safeprojectname$.Modules.Email.Settings;
-using Serilog;
+using MinimalApiStartupProject.Infrastructures.Attributes;
+using MinimalApiStartupProject.Infrastructures.StringExtensions;
+using MinimalApiStartupProject.Modules.Email.Entities;
+using MinimalApiStartupProject.Modules.Email.Enums;
+using MinimalApiStartupProject.Modules.Email.Interfaces.Services;
+using MinimalApiStartupProject.Modules.Email.Settings;
+using System.Text.Json;
 
-namespace $safeprojectname$.Modules.Email.Services
+namespace MinimalApiStartupProject.Modules.Email.Services
 {
     [ScopedLifetime]
     internal class EmailService : IEmailService
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IConfiguration configuration)
+        public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
         {
             _configuration = configuration;
+            _logger = logger;
         }
 
-        private MimeMessage? getMimeMessage(EmailMessage message)
+        /// <summary>
+        /// Private method to get MimeMessage object from EmailMessage
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private MimeMessage? GetMimeMessage(EmailMessage message)
         {
             MimeMessage? mimeMessage = null;
 
@@ -63,8 +71,8 @@ namespace $safeprojectname$.Modules.Email.Services
 
             BodyBuilder bodyBuilder = new BodyBuilder()
             {
-                HtmlBody = message.BodyFormat == EmailBodyFormats.Html ? message.Body : null,
-                TextBody = message.BodyFormat == EmailBodyFormats.Text ? message.Body : null,
+                HtmlBody = message.BodyFormat == EmailBodyFormat.Html ? message.Body : null,
+                TextBody = message.BodyFormat == EmailBodyFormat.Text ? message.Body : null,
             };
 
             if (!message.Attachments.IsNullOrEmpty())
@@ -100,13 +108,20 @@ namespace $safeprojectname$.Modules.Email.Services
             return mimeMessage;
         }
 
-        private async Task send(MimeMessage message, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Private async method to send MimeMessage
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        private async Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
         {
             EmailSetting? settings = _configuration.Get<EmailSetting>();
 
             if (settings is null || string.IsNullOrWhiteSpace(settings.Host) || string.IsNullOrWhiteSpace(settings.Username) || string.IsNullOrWhiteSpace(settings.Password))
             {
-                Log.Error("{emailService} - {sendEmail} - ERROR: Send email - Configurations are not valid", new object[] { nameof(EmailService), nameof(SendEmail) }, null);
+                _logger.LogException(nameof(EmailService), nameof(SendEmailAsync), JsonSerializer.Serialize(settings), "Configurations are not valid");
 
                 throw new Exception("Send email - Configurations are not valid");
             }
@@ -126,23 +141,30 @@ namespace $safeprojectname$.Modules.Email.Services
             }
             catch (Exception ex)
             {
-                Log.Error("{emailService} - {sendEmail} - ERROR: Send email - {exceptionMessage}", new object[] { nameof(EmailService), nameof(SendEmail), ex.Message }, ex);
+                _logger.LogException(nameof(EmailService), nameof(SendEmailAsync), JsonSerializer.Serialize(message), ex.Message);
 
                 throw;
             }
         }
 
-        public async Task SendEmail(EmailMessage message, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Async method to send EmailMessage
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task SendEmailAsync(EmailMessage message, CancellationToken cancellationToken = default)
         {
-            MimeMessage? mimeMessage = getMimeMessage(message);
+            MimeMessage? mimeMessage = GetMimeMessage(message);
             if (mimeMessage is null)
             {
-                Log.Error("{emailService} - {sendEmail} - ERROR: MimeMessage is null", new object[] { nameof(EmailService), nameof(SendEmail) }, null);
+                _logger.LogException(nameof(EmailService), nameof(SendEmailAsync), JsonSerializer.Serialize(message), "MimeMessage is null");
 
                 throw new Exception("MimeMessage is null");
             }
 
-            await send(mimeMessage, cancellationToken);
+            await SendAsync(mimeMessage, cancellationToken);
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace $safeprojectname$.Modules.Api.Models
+namespace MinimalApiStartupProject.Modules.Api.Models
 {
 	public class RequestHeader
 	{

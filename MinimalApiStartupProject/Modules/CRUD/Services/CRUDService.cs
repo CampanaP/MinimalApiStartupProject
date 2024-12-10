@@ -1,84 +1,116 @@
 ﻿using Dapper;
-using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
-using $safeprojectname$.Modules.CRUD.Interfaces.Services;
-using $safeprojectname$.Modules.Sql.Interfaces.Repositories;
-using $safeprojectname$.Modules.Sql.Models;
-using Serilog;
+using MinimalApiStartupProject.Infrastructures.Attributes;
+using MinimalApiStartupProject.Infrastructures.StringExtensions;
+using MinimalApiStartupProject.Modules.CRUD.Interfaces.Services;
+using MinimalApiStartupProject.Modules.Sql.Interfaces.Repositories;
+using MinimalApiStartupProject.Modules.Sql.Models;
+using System.Text.Json;
 
-namespace $safeprojectname$.Modules.CRUD.Services
+namespace MinimalApiStartupProject.Modules.CRUD.Services
 {
     [ScopedLifetime]
     public class CRUDService : ICRUDService
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<CRUDService> _logger;
         private readonly ISqlRepository _sqlRepository;
 
-        public CRUDService(IConfiguration configuration, ISqlRepository sqlRepository)
+        public CRUDService(IConfiguration configuration, ILogger<CRUDService> logger, ISqlRepository sqlRepository)
         {
             _configuration = configuration;
+            _logger = logger;
             _sqlRepository = sqlRepository;
         }
 
-        public async Task<IEnumerable<T>> GetItems<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to get items
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connectionStringName"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<T>> GetItemsAsync<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
         {
             IEnumerable<T> items = Enumerable.Empty<T>();
 
             string? connectionString = _configuration.GetConnectionString(connectionStringName);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                Log.Error($"{nameof(CRUDService)} - {nameof(GetItems)} - {query}: ConnectionString is empty");
+                _logger.LogException(nameof(CRUDService), nameof(GetItemsAsync), query, "ConnectionString is empty");
 
                 return items;
             }
 
-            items = await _sqlRepository.ExecuteQuery<T>(connectionString, query, parameters);
+            items = await _sqlRepository.ExecuteQueryAsync<T>(connectionString, query, parameters);
 
             return items;
         }
 
-        public async Task<T?> GetItem<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
+        /// <summary>
+        /// Async method to get single item
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connectionStringName"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task<T?> GetItemAsync<T>(string connectionStringName, string query, DynamicParameters? parameters = null)
         {
             T? item = default(T?);
 
             string? connectionString = _configuration.GetConnectionString(connectionStringName);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                Log.Error($"{nameof(CRUDService)} - {nameof(GetItem)} - {query}: ConnectionString is empty");
+                _logger.LogException(nameof(CRUDService), nameof(GetItemsAsync), query, "ConnectionString is empty");
 
                 return item;
             }
 
-            item = await _sqlRepository.ExecuteFirstQuery<T>(connectionString, query, parameters);
+            item = await _sqlRepository.ExecuteFirstQueryAsync<T>(connectionString, query, parameters);
 
             return item;
         }
 
-        public async Task SaveItems(string connectionStringName, List<TransactionQuery> queries)
+        /// <summary>
+        /// Async method to save items
+        /// </summary>
+        /// <param name="connectionStringName"></param>
+        /// <param name="queries"></param>
+        /// <returns></returns>
+        public async Task SaveItemsAsync(string connectionStringName, List<TransactionQuery> queries)
         {
             string? connectionString = _configuration.GetConnectionString(connectionStringName);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                Log.Error($"{nameof(CRUDService)} - {nameof(SaveItems)}: ConnectionString is empty");
+                _logger.LogException(nameof(CRUDService), nameof(GetItemsAsync), JsonSerializer.Serialize(queries), "ConnectionString is empty");
 
                 return;
             }
 
-            await _sqlRepository.ExecuteTransaction(connectionString, queries);
+            await _sqlRepository.ExecuteTransactionAsync(connectionString, queries);
 
             return;
         }
 
-        public async Task SaveItem(string connectionStringName, string query, DynamicParameters parameters)
+        /// <summary>
+        /// Async method to save single item
+        /// </summary>
+        /// <param name="connectionStringName"></param>
+        /// <param name="query"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
+        public async Task SaveItemAsync(string connectionStringName, string query, DynamicParameters parameters)
         {
             string? connectionString = _configuration.GetConnectionString(connectionStringName);
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                Log.Error($"{nameof(CRUDService)} - {nameof(SaveItem)} - {query}: ConnectionString is empty");
+                _logger.LogException(nameof(CRUDService), nameof(GetItemsAsync), query, "ConnectionString is empty");
 
                 return;
             }
 
-            await _sqlRepository.ExecuteNonQuery(connectionString, query, parameters);
+            await _sqlRepository.ExecuteNonQueryAsync(connectionString, query, parameters);
 
             return;
         }

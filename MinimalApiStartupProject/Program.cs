@@ -1,22 +1,19 @@
-using $safeprojectname$.Infrastructures.ModuleExtensions;
-using $safeprojectname$.Infrastructures.ServiceExtensions;
+using Microsoft.Extensions.DependencyInjection;
+using MinimalApiStartupProject.Infrastructures.Extensions;
 using Serilog;
 
-namespace $safeprojectname$
+namespace MinimalApiStartupProject
 {
     public class Program
     {
         public static void Main(string[] args)
         {
-            Log.Logger = new LoggerConfiguration()
-                .WriteTo.File("Logs/log.txt",
-                    rollingInterval: RollingInterval.Day,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                .CreateLogger();
-
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-            builder.Host.UseSerilog();
-            builder.Services.AddFromAttributes();
+
+            builder.Host.UseSerilog((context, config) =>
+                config.ReadFrom.Configuration(context.Configuration));
+
+            builder.Services.RegisterServicesFromAttributes();
             builder.Services.RegisterModules();
 
             builder.Services.AddEndpointsApiExplorer();

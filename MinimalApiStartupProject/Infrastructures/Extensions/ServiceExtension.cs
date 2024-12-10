@@ -1,11 +1,16 @@
-﻿using $safeprojectname$.Infrastructures.ServiceExtensions.Attributes;
+﻿using MinimalApiStartupProject.Infrastructures.Attributes;
 using Scrutor;
 
-namespace $safeprojectname$.Infrastructures.ServiceExtensions
+namespace MinimalApiStartupProject.Infrastructures.Extensions
 {
-    public static class ServiceExtensions
+    public static class ServiceExtension
     {
-        public static IServiceCollection AddFromAttributes(this IServiceCollection services)
+        /// <summary>
+        /// Method to register services with Lifetime attributes
+        /// </summary>
+        /// <param name="services"></param>
+        /// <returns></returns>
+        public static IServiceCollection RegisterServicesFromAttributes(this IServiceCollection services)
         {
             return services
                 .Scan(scan => scan
